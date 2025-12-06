@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Secure Image Encryption for WhatsApp Sharing</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #111827;
+      --accent: #22c55e;
+      --accent2: #38bdf8;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --danger: #ef4444;
+      --border: #1f2937;
+    }
+    body {
+      margin: 0;
+      background: linear-gradient(120deg, #0f172a 0%, #0b1220 100%);
+      color: var(--text);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans";
+    }
+    header {
+      padding: 20px 16px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(255,255,255,0.03);
+      position: sticky; top: 0; backdrop-filter: blur(6px);
+    }
+    header h1 { margin: 0; font-size: 20px; }
+    header p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+    .container {
+      max-width: 1100px; margin: 24px auto; padding: 0 16px;
+      display: grid; gap: 16px;
+      grid-template-columns: 1fr 1fr;
+    }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .card h2 { margin: 0 0 8px; font-size: 18px; }
+    .row { display: grid; gap: 12px; margin: 12px 0; }
+    label { font-size: 12px; color: var(--muted); }
+    input[type="file"], input[type="text"], input[type="password"] {
+      width: 100%; padding: 10px 12px; border-radius: 8px;
+      border: 1px solid var(--border); background: #0b1220; color: var(--text);
+      outline: none;
+    }
+    input[type="checkbox"] { transform: translateY(2px); }
+    .inline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    button {
+      padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border);
+      cursor: pointer; background: #0b1322; color: var(--text);
+      transition: all 0.15s ease-in-out;
+    }
+    button:hover { border-color: #334155; transform: translateY(-1px); }
+    .primary { background: #0c2a19; border-color: #134e4a; color: #c7f7da; }
+    .primary:hover { background: #0f3621; }
+    .info { background: #0b2740; border-color: #1f3b61; color: #d2efff; }
+    .info:hover { background: #0d3453; }
+    .muted { color: var(--muted); font-size: 12px; }
+    .badge {
+      display: inline-block; padding: 4px 8px; border-radius: 999px;
+      background: #0b2740; color: #bfe7ff; font-size: 11px; border: 1px solid #1f3b61;
+    }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .preview { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    canvas, img {
+      width: 100%; border-radius: 10px; border: 1px solid var(--border); background: #0a0f1a;
+    }
+    .code { font-family: ui-monospace, Menlo, Consolas, monospace; color: #9ee8ff; }
+    .footer { padding: 16px; text-align: center; color: var(--muted); font-size: 12px; }
+    .whatsapp-tip {
+      margin-top: 8px; padding: 10px; border-radius: 8px;
+      background: #0a1a2a; border: 1px solid #1f3b61; color: #cde7ff; font-size: 12px;
+    }
+    @media (max-width: 880px) {
+      .container { grid-template-columns: 1fr; }
+      .preview { grid-template-columns: 1fr; }
+      .grid-2 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Secure Image Encryption for WhatsApp Sharing</h1>
+    <p>AES-GCM encryption with optional pixel scrambling. Send the .enc file as a WhatsApp document and share the key separately.</p>
+  </header>
+
+  <div class="container">
+
+    <!-- ENCRYPTION PANEL -->
+    <section class="card">
+      <h2>Encrypt an image</h2>
+
+      <div class="row">
+        <div class="grid-2">
+          <div>
+            <label>Select image file</label>
+            <input id="encFile" type="file" accept="image/*" />
+          </div>
+          <div>
+            <label>Secret key</label>
+            <input id="encKey" type="password" placeholder="Enter secret key" />
+          </div>
+        </div>
+
+        <div class="inline">
+          <input id="pixelToggle" type="checkbox" checked />
+          <label for="pixelToggle">Enable pixel scrambling (reversible)</label>
+          <span class="badge">Recommended</span>
+        </div>
+
+        <div class="inline">
+          <button class="primary" id="encryptBtn">Encrypt & download .enc</button>
+          <button class="info" id="previewBtn">Preview pixel scramble</button>
+          <span class="muted">Encryption is AES-GCM; scrambling adds a reversible layer before encryption.</span>
+        </div>
+
+        <div class="preview">
+          <div>
+            <label>Original image preview</label>
+            <img id="origPreview" alt="Original preview" />
+          </div>
+          <div>
+            <label>Pixel-scrambled preview (not encrypted)</label>
+            <canvas id="scrambleCanvas"></canvas>
+          </div>
+        </div>
+
+        <div>
+          <label>Encryption metadata</label>
+          <div class="muted code" id="encMeta"></div>
+        </div>
+
+        <div class="whatsapp-tip">
+          <strong>Send on WhatsApp:</strong> Open WhatsApp ➜ attach ➜ Document ➜ choose the .enc file from Downloads/Files. Share the key in a separate message.
+        </div>
+      </div>
+    </section>
+
+    <!-- DECRYPTION PANEL -->
+    <section class="card">
+      <h2>Decrypt received .enc file</h2>
+
+      <div class="row">
+        <div class="grid-2">
+          <div>
+            <label>Select encrypted file (.enc)</label>
+            <input id="decFile" type="file" />
+          </div>
+          <div>
+            <label>Secret key</label>
+            <input id="decKey" type="password" placeholder="Enter the same secret key" />
+          </div>
+        </div>
+
+        <div class="inline">
+          <button class="primary" id="decryptBtn">Decrypt & download image</button>
+          <button class="info" id="viewDecryptedBtn">View decrypted image</button>
+        </div>
+
+        <div class="preview">
+          <div>
+            <label>Decrypted image preview</label>
+            <img id="decPreview" alt="Decrypted preview" />
+          </div>
+          <div>
+            <label>Cipher info</label>
+            <div class="muted code" id="decMeta"></div>
+          </div>
+        </div>
+
+        <div class="whatsapp-tip">
+          <strong>Recipient steps:</strong> Open this page ➜ select the .enc file you received ➜ enter the key ➜ decrypt to restore the original image.
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <div class="footer">
+    Files use AES-GCM with PBKDF2-derived keys. The .enc embeds salt, iv, MIME, original name, and whether pixel scrambling was used.
+  </div>
+
+  <script>
+    // Utility: read file as ArrayBuffer
+    function readFileAsArrayBuffer(file) {
+      return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(fr.result);
+        fr.onerror = reject;
+        fr.readAsArrayBuffer(file);
+      });
+    }
+
+    // Utility: read file as data URL
+    function readFileAsDataURL(file) {
+      return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(fr.result);
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+      });
+    }
+
+    // Derive AES-GCM key from passphrase using PBKDF2
+    async function deriveKeyFromPassphrase(passphrase, saltBytes) {
+      const enc = new TextEncoder();
+      const baseKey = await crypto.subtle.importKey(
+        "raw",
+        enc.encode(passphrase),
+        "PBKDF2",
+        false,
+        ["deriveKey"]
+      );
+      const key = await crypto.subtle.deriveKey(
+        {
+          name: "PBKDF2",
+          salt: saltBytes,
+          iterations: 120000,
+          hash: "SHA-256"
+        },
+        baseKey,
+        { name: "AES-GCM", length: 256 },
+        false,
+        ["encrypt", "decrypt"]
+      );
+      return key;
+    }
+
+    // Pixel scrambling: deterministic PRNG and permutation from key+salt
+    async function pixelScramble(imageBlob, passphrase, saltBytes) {
+      const imgBitmap = await createImageBitmap(imageBlob);
+      const canvas = document.getElementById("scrambleCanvas");
+      canvas.width = imgBitmap.width;
+      canvas.height = imgBitmap.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(imgBitmap, 0, 0);
+
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data; // RGBA flat array
+      const pixelCount = data.length / 4;
+
+      // Seed = SHA-256(passphrase || salt)
+      const enc = new TextEncoder();
+      const passBytes = enc.encode(passphrase);
+      const seedConcat = new Uint8Array(saltBytes.length + passBytes.length);
+      seedConcat.set(saltBytes, 0); seedConcat.set(passBytes, saltBytes.length);
+      const seedHash = new Uint8Array(await crypto.subtle.digest("SHA-256", seedConcat));
+
+      // Deterministic PRNG
+      let s0 = (seedHash[0] << 24) | (seedHash[1] << 16) | (seedHash[2] << 8) | seedHash[3];
+      let s1 = (seedHash[4] << 24) | (seedHash[5] << 16) | (seedHash[6] << 8) | seedHash[7];
+      function rand32() {
+        let x = s0 ^ (s0 << 13);
+        s0 = s1; s1 = x ^ s1 ^ (x >>> 17) ^ (s1 >>> 5);
+        return (s1 >>> 0);
+      }
+
+      // Permutation via Fisher–Yates
+      const perm = new Uint32Array(pixelCount);
+      for (let i = 0; i < pixelCount; i++) perm[i] = i;
+      for (let i = pixelCount - 1; i > 0; i--) {
+        const j = rand32() % (i + 1);
+        const tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
+      }
+
+      // XOR masks per channel
+      const maskR = rand32() & 0xff;
+      const maskG = rand32() & 0xff;
+      const maskB = rand32() & 0xff;
+
+      // Apply scramble
+      const out = new Uint8ClampedArray(data.length);
+      for (let i = 0; i < pixelCount; i++) {
+        const srcIdx = i * 4;
+        const dstIdx = perm[i] * 4;
+        out[dstIdx + 0] = data[srcIdx + 0] ^ maskR;
+        out[dstIdx + 1] = data[srcIdx + 1] ^ maskG;
+        out[dstIdx + 2] = data[srcIdx + 2] ^ maskB;
+        out[dstIdx + 3] = data[srcIdx + 3];
+      }
+
+      const scrambled = new ImageData(out, canvas.width, canvas.height);
+      ctx.putImageData(scrambled, 0, 0);
+
+      // Return PNG blob
+      const scrambledBlob = await new Promise(resolve => canvas.toBlob(resolve, "image/png", 0.92));
+      return scrambledBlob;
+    }
+
+    // Encrypt: optional pixel scramble ➜ AES-GCM ➜ package header + ciphertext
+    async function encryptImage(file, passphrase, enablePixel) {
+      const origArrayBuffer = await readFileAsArrayBuffer(file);
+      const origType = file.type || "application/octet-stream";
+      const origName = file.name || "image";
+
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      const key = await deriveKeyFromPassphrase(passphrase, salt);
+
+      let toEncryptBlob;
+      let pipeline = "aes-gcm";
+      if (enablePixel && origType.startsWith("image/")) {
+        toEncryptBlob = await pixelScramble(new Blob([origArrayBuffer], { type: origType }), passphrase, salt);
+        pipeline = "pixel-scramble + aes-gcm";
+      } else {
+        toEncryptBlob = new Blob([origArrayBuffer], { type: origType });
+      }
+      const toEncryptArrayBuffer = await toEncryptBlob.arrayBuffer();
+
+      const ciphertext = new Uint8Array(await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv },
+        key,
+        toEncryptArrayBuffer
+      ));
+
+      const header = {
+        v: 1,
+        alg: "AES-GCM",
+        kdf: "PBKDF2-SHA256-120k",
+        pipeline,
+        mime: toEncryptBlob.type,
+        origName,
+        salt: Array.from(salt),
+        iv: Array.from(iv),
+        ts: new Date().toISOString()
+      };
+      const headerJson = JSON.stringify(header);
+      const headerBytes = new TextEncoder().encode(headerJson);
+      const headerLen = new Uint32Array([headerBytes.length]); // 4 bytes LE
+      const packageBlob = new Blob([headerLen.buffer, headerBytes, ciphertext], { type: "application/octet-stream" });
+
+      return { blob: packageBlob, header };
+    }
+
+    // Decrypt: read header ➜ derive key ➜ AES-GCM ➜ reverse scramble if used
+    async function decryptPackage(file, passphrase) {
+      const ab = await readFileAsArrayBuffer(file);
+      const u8 = new Uint8Array(ab);
+
+      if (u8.length < 4) throw new Error("Invalid file.");
+      const headerLenView = new DataView(ab, 0, 4);
+      const headerLen = headerLenView.getUint32(0, true); // little-endian
+      if (u8.length < 4 + headerLen + 1) throw new Error("Corrupt file.");
+
+      const headerBytes = u8.slice(4, 4 + headerLen);
+      const headerText = new TextDecoder().decode(headerBytes);
+      const header = JSON.parse(headerText);
+
+      const salt = new Uint8Array(header.salt);
+      const iv = new Uint8Array(header.iv);
+      const key = await deriveKeyFromPassphrase(passphrase, salt);
+
+      const ciphertext = u8.slice(4 + headerLen);
+      let decrypted;
+      try {
+        decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, ciphertext);
+      } catch {
+        throw new Error("Decryption failed. Check your key.");
+      }
+
+      let outBlob;
+      if ((header.pipeline || "").includes("pixel-scramble")) {
+        const scrambledBlob = new Blob([decrypted], { type: header.mime || "image/png" });
+        const imgBitmap = await createImageBitmap(scrambledBlob);
+        const canvas = document.createElement("canvas");
+        canvas.width = imgBitmap.width; canvas.height = imgBitmap.height;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(imgBitmap, 0, 0);
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const data = imageData.data;
+        const pixelCount = data.length / 4;
+
+        const enc = new TextEncoder();
+        const passBytes = enc.encode(passphrase);
+        const seedConcat = new Uint8Array(salt.length + passBytes.length);
+        seedConcat.set(salt, 0); seedConcat.set(passBytes, salt.length);
+        const seedHash = new Uint8Array(await crypto.subtle.digest("SHA-256", seedConcat));
+        let s0 = (seedHash[0] << 24) | (seedHash[1] << 16) | (seedHash[2] << 8) | seedHash[3];
+        let s1 = (seedHash[4] << 24) | (seedHash[5] << 16) | (seedHash[6] << 8) | seedHash[7];
+        function rand32() {
+          let x = s0 ^ (s0 << 13);
+          s0 = s1; s1 = x ^ s1 ^ (x >>> 17) ^ (s1 >>> 5);
+          return (s1 >>> 0);
+        }
+
+        const perm = new Uint32Array(pixelCount);
+        for (let i = 0; i < pixelCount; i++) perm[i] = i;
+        for (let i = pixelCount - 1; i > 0; i--) {
+          const j = rand32() % (i + 1);
+          const tmp = perm[i]; perm[i] = perm[j]; perm[j] = tmp;
+        }
+        const inv = new Uint32Array(pixelCount);
+        for (let i = 0; i < pixelCount; i++) inv[perm[i]] = i;
+
+        const maskR = rand32() & 0xff;
+        const maskG = rand32() & 0xff;
+        const maskB = rand32() & 0xff;
+
+        const out = new Uint8ClampedArray(data.length);
+        for (let dst = 0; dst < pixelCount; dst++) {
+          const sIdx = dst * 4;
+          const oIdx = inv[dst] * 4;
+          out[oIdx + 0] = data[sIdx + 0] ^ maskR;
+          out[oIdx + 1] = data[sIdx + 1] ^ maskG;
+          out[oIdx + 2] = data[sIdx + 2] ^ maskB;
+          out[oIdx + 3] = data[sIdx + 3];
+        }
+
+        const restored = new ImageData(out, canvas.width, canvas.height);
+        ctx.putImageData(restored, 0, 0);
+        outBlob = await new Promise(resolve => canvas.toBlob(resolve, "image/png", 0.92));
+      } else {
+        outBlob = new Blob([decrypted], { type: header.mime || "application/octet-stream" });
+      }
+
+      return { blob: outBlob, header };
+    }
+
+    // UI wiring
+    const encFileInput = document.getElementById("encFile");
+    const encKeyInput = document.getElementById("encKey");
+    const pixelToggle = document.getElementById("pixelToggle");
+    const encryptBtn = document.getElementById("encryptBtn");
+    const previewBtn = document.getElementById("previewBtn");
+    const origPreview = document.getElementById("origPreview");
+    const encMeta = document.getElementById("encMeta");
+
+    const decFileInput = document.getElementById("decFile");
+    const decKeyInput = document.getElementById("decKey");
+    const decryptBtn = document.getElementById("decryptBtn");
+    const viewDecryptedBtn = document.getElementById("viewDecryptedBtn");
+    const decPreview = document.getElementById("decPreview");
+    const decMeta = document.getElementById("decMeta");
+
+    // Image preview when selecting file
+    encFileInput.addEventListener("change", async () => {
+      const file = encFileInput.files?.[0];
+      if (!file) return;
+      const url = await readFileAsDataURL(file);
+      origPreview.src = url;
+      encMeta.textContent = "";
+      const canvas = document.getElementById("scrambleCanvas");
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    });
+
+    // Preview pixel scramble (not encrypted)
+    previewBtn.addEventListener("click", async () => {
+      const file = encFileInput.files?.[0];
+      const pass = encKeyInput.value;
+      if (!file) return alert("Please select an image.");
+      if (!pass) return alert("Please enter a secret key.");
+      try {
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        await pixelScramble(file, pass, salt);
+      } catch (e) {
+        console.error(e);
+        alert("Pixel scramble preview failed.");
+      }
+    });
+
+    // Encrypt and download .enc file
+    encryptBtn.addEventListener("click", async () => {
+      const file = encFileInput.files?.[0];
+      const pass = encKeyInput.value;
+      const enablePixel = pixelToggle.checked;
+
+      if (!file) return alert("Please select an image.");
+      if (!pass) return alert("Please enter a secret key.");
+
+      encryptBtn.disabled = true;
+      encryptBtn.textContent = "Encrypting...";
+      try {
+        const { blob, header } = await encryptImage(file, pass, enablePixel);
+        encMeta.textContent = JSON.stringify(header, null, 2);
+
+        // Trigger download (.enc)
+        const a = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        a.href = url;
+        a.download = (file.name || "image") + ".enc";
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        }, 800);
+
+        encryptBtn.textContent = "Encrypt & download .enc";
+      } catch (e) {
+        console.error(e);
+        alert("Encryption failed: " + e.message);
+        encryptBtn.textContent = "Encrypt & download .enc";
+      } finally {
+        encryptBtn.disabled = false;
+      }
+    });
+
+    // Decrypt and download image
+    decryptBtn.addEventListener("click", async () => {
+      const file = decFileInput.files?.[0];
+      const pass = decKeyInput.value;
+      if (!file) return alert("Please select the encrypted file (.enc).");
+      if (!pass) return alert("Please enter the same secret key.");
+
+      decryptBtn.disabled = true;
+      decryptBtn.textContent = "Decrypting...";
+      try {
+        const { blob, header } = await decryptPackage(file, pass);
+        decMeta.textContent = JSON.stringify(header, null, 2);
+
+        const a = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        a.href = url;
+        const ext = (header.pipeline || "").includes("pixel-scramble") ? ".png" : "";
+        a.download = (header.origName || "decrypted_image") + (ext || "");
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => {
+          URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        }, 800);
+
+        decryptBtn.textContent = "Decrypt & download image";
+      } catch (e) {
+        console.error(e);
+        alert("Decryption failed: " + e.message);
+        decryptBtn.textContent = "Decrypt & download image";
+      } finally {
+        decryptBtn.disabled = false;
+      }
+    });
+
+    // View decrypted image (inline preview)
+    viewDecryptedBtn.addEventListener("click", async () => {
+      const file = decFileInput.files?.[0];
+      const pass = decKeyInput.value;
+      if (!file) return alert("Please select the encrypted file (.enc).");
+      if (!pass) return alert("Please enter the same secret key.");
+
+      viewDecryptedBtn.disabled = true;
+      viewDecryptedBtn.textContent = "Decrypting...";
+      try {
+        const { blob, header } = await decryptPackage(file, pass);
+        decMeta.textContent = JSON.stringify(header, null, 2);
+        const url = URL.createObjectURL(blob);
+        decPreview.src = url;
+        viewDecryptedBtn.textContent = "View decrypted image";
+      } catch (e) {
+        console.error(e);
+        alert("Decryption failed: " + e.message);
+        viewDecryptedBtn.textContent = "View decrypted image";
+      } finally {
+        viewDecryptedBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>
